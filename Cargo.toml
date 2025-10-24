@@ -1,0 +1,63 @@
+[package]
+name = "rust-canvas-mcp"
+version = "0.1.0"
+edition = "2021"
+authors = ["GarthDB <garthdb@example.com>"]
+description = "A high-performance Rust-based MCP server for Canvas LMS API integration"
+license = "MIT"
+repository = "https://github.com/GarthDB/rust-canvas-mcp"
+keywords = ["mcp", "canvas", "lms", "api", "server"]
+categories = ["api-bindings", "development-tools"]
+
+[[bin]]
+name = "rust-canvas-mcp"
+path = "src/main.rs"
+
+[dependencies]
+# MCP Protocol
+rmcp = "0.1"
+rmcp-macros = "0.1"
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# HTTP Client
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# Error Handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging (to file only, never stderr)
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.2"
+
+# Configuration
+dotenvy = "0.15"
+
+# Date/Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Utilities
+url = "2.5"
+uuid = { version = "1.0", features = ["v4"] }
+
+# Performance optimization
+dashmap = "5.5"
+moka = { version = "0.12", features = ["future"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockito = "1.0"
+tempfile = "3.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
