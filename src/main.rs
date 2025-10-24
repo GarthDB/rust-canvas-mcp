@@ -1,6 +1,8 @@
-use rust_canvas_mcp::{CanvasClient, CanvasConfig};
+use rmcp::ServerHandler;
+use rust_canvas_mcp::{CanvasConfig, CanvasServer};
 use std::env;
-use std::sync::Arc;
+use std::fs;
+use tracing_subscriber::fmt::writer::MakeWriterExt;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -10,24 +12,55 @@ async fn main() -> anyhow::Result<()> {
         return run_connection_test().await;
     }
 
-    println!("Rust Canvas MCP Server");
-    println!("Version: {}", env!("CARGO_PKG_VERSION"));
-    println!();
-    println!("This is a Phase 2 implementation demonstrating:");
-    println!("- Configuration loading from environment");
-    println!("- Canvas API HTTP client");
-    println!("- Connection testing");
-    println!();
-    println!("Usage:");
-    println!("  cargo run -- --test    Test Canvas API connection");
-    println!();
-    println!("Full MCP server implementation coming in Phase 2 (Issue #4)");
+    // Setup logging to file ONLY (never stderr during normal operation)
+    setup_logging();
+
+    // Load configuration
+    let config = CanvasConfig::from_env().map_err(|e| {
+        // Configuration errors can go to stderr during startup
+        eprintln!("Configuration error: {}", e);
+        eprintln!();
+        eprintln!("Required environment variables:");
+        eprintln!("  CANVAS_API_TOKEN - Your Canvas API access token");
+        eprintln!("  CANVAS_API_URL - Your Canvas API URL");
+        e
+    })?;
+
+    // Create server
+    let server = CanvasServer::new(config)?;
+
+    // Serve via stdio - THIS MUST PRODUCE ZERO STDERR OUTPUT
+    // Pass stdin/stdout as a tuple for the transport
+    let io = (tokio::io::stdin(), tokio::io::stdout());
+    rmcp::serve_server(server, io).await?;
 
     Ok(())
 }
 
+/// Setup logging to file only (never stderr)
+fn setup_logging() {
+    // Create log directory if it doesn't exist
+    let log_dir = "/tmp/canvas-mcp";
+    fs::create_dir_all(log_dir).ok();
+
+    // Create daily rolling file appender
+    let file_appender = tracing_appender::rolling::daily(log_dir, "server.log");
+
+    // Only write to file, never stderr
+    let file_writer = file_appender.with_max_level(tracing::Level::DEBUG);
+
+    tracing_subscriber::fmt()
+        .with_writer(file_writer)
+        .with_ansi(false)
+        .with_target(false)
+        .init();
+}
+
 /// Run connection test
 async fn run_connection_test() -> anyhow::Result<()> {
+    use rust_canvas_mcp::CanvasClient;
+    use std::sync::Arc;
+
     println!("Testing Canvas API connection...");
     println!();
 
@@ -52,7 +85,7 @@ async fn run_connection_test() -> anyhow::Result<()> {
     };
 
     // Create HTTP client
-    let client = match CanvasClient::new(Arc::new(config)) {
+    let client = match CanvasClient::new(Arc::new(config.clone())) {
         Ok(c) => {
             println!("✓ HTTP client created");
             c
@@ -74,8 +107,6 @@ async fn run_connection_test() -> anyhow::Result<()> {
             if let Some(id) = user.get("id").and_then(|v| v.as_u64()) {
                 println!("  User ID: {}", id);
             }
-            println!();
-            println!("✓ All tests passed!");
         }
         Err(e) => {
             println!("✗");
@@ -85,6 +116,26 @@ async fn run_connection_test() -> anyhow::Result<()> {
             eprintln!("  - Your API token is valid");
             eprintln!("  - Your API URL is correct");
             eprintln!("  - You have network access to Canvas");
+            std::process::exit(1);
+        }
+    }
+
+    // Test MCP server creation
+    print!("Testing MCP server creation... ");
+    match CanvasServer::new(config) {
+        Ok(server) => {
+            println!("✓");
+            let info = server.get_info();
+            println!(
+                "  Server: {} v{}",
+                info.server_info.name, info.server_info.version
+            );
+            println!();
+            println!("✓ All tests passed!");
+        }
+        Err(e) => {
+            println!("✗");
+            eprintln!("✗ Failed to create MCP server: {}", e);
             std::process::exit(1);
         }
     }
