@@ -1,0 +1,17 @@
+# LLVM Coverage Configuration
+
+[build]
+target-dir = "target/llvm-cov-target"
+
+[report]
+html = true
+lcov = true
+ignore-filename-regex = [
+    "tests/",
+    "benches/",
+    ".cargo/",
+]
+
+[run]
+ignore-run-fail = false
+
