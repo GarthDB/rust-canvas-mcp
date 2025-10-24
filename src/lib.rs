@@ -5,8 +5,10 @@
 pub mod client;
 pub mod config;
 pub mod error;
+pub mod server;
 
 // Re-export commonly used types
 pub use client::CanvasClient;
 pub use config::CanvasConfig;
 pub use error::{CanvasError, Result};
+pub use server::CanvasServer;
